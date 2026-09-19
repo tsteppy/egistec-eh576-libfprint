@@ -134,7 +134,24 @@ version:
 
 The matcher sits behind a two-function interface (`em_frame_compute` /
 `em_match` in `driver/egis_match.h`) so it can be replaced without touching
-any USB or state-machine code.
+any USB or state-machine code. One replacement ships in-tree, opt-in:
+
+```
+EGIS0576_FRONTEND=gabor ./install.sh
+```
+
+links `driver/egis_match_gabor.c` instead of `egis_match.c` — same interface,
+an orientation-selective Gabor enhancement in place of the high-pass, a
+per-pixel coherence mask and a ±10° rotation search on top of the
+translation search, and its own operating point (the threshold and coverage
+gate belong to the front-end, `em_match_threshold` / `em_min_coverage`).
+On the one unit it was measured on (60 genuine / 480 same-person impostor
+press comparisons, raw frames as this driver feeds them) the two populations
+stop overlapping: lowest genuine 0.81, highest impostor 0.77, 0 % / 0 % with
+the threshold chosen on one half of the data and applied to the other. Every
+parameter was chosen on that same unit, which is exactly why it is opt-in
+until someone else's score table says the same; the file's header has the
+numbers, the cost (4 ms per comparison) and the caveats.
 
 ## Known limitations
 

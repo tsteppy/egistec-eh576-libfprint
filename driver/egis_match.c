@@ -50,6 +50,11 @@
 #define EM_MIN_OVERLAP 800
 #endif
 
+/* Operating point of this front-end (see egis_match.h); the values and
+ * their measurement used to live in egis0576.c. */
+const double em_match_threshold = 0.53;
+const double em_min_coverage = 0.55;
+
 /* Box mean with edge replication (scipy uniform_filter mode='nearest'):
  * window indices clamp to the frame, denominator is the full window area. */
 static void

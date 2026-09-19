@@ -76,8 +76,18 @@ fi
 
 bold "== adding the driver =="
 cp "$SRC_DIR"/driver/egis0576.c "$SRC_DIR"/driver/egis0576.h \
-   "$SRC_DIR"/driver/egis_match.c "$SRC_DIR"/driver/egis_match.h \
+   "$SRC_DIR"/driver/egis_match.h \
    "$LIBFPRINT_DIR/libfprint/drivers/"
+# The matcher front-end. Default: egis_match.c. EGIS0576_FRONTEND=gabor
+# links driver/egis_match_gabor.c instead (same interface, its own operating
+# point; see its header). It is copied in under the registered name so the
+# meson registration below stays a one-liner.
+case "${EGIS0576_FRONTEND:-default}" in
+  default) cp "$SRC_DIR"/driver/egis_match.c "$LIBFPRINT_DIR/libfprint/drivers/egis_match.c" ;;
+  gabor)   cp "$SRC_DIR"/driver/egis_match_gabor.c "$LIBFPRINT_DIR/libfprint/drivers/egis_match.c"
+           green "front-end: egis_match_gabor.c" ;;
+  *)       die "EGIS0576_FRONTEND must be 'default' or 'gabor'" ;;
+esac
 
 # register in both meson files, idempotently
 if ! grep -q "'egis0576'" "$LIBFPRINT_DIR/meson.build"; then

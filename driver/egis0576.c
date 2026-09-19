@@ -48,10 +48,15 @@ static const guint8 img_req[]  = { 0x45, 0x47, 0x49, 0x53, 0x64, 0x0f, 0x96 };
 #define EGIS0576_SETTLE_FRAMES 3      /* no-improvement frames before accept */
 #define EGIS0576_PRESS_FRAMES_MAX 20  /* hard cap per press                  */
 
-/* Matcher operating points, from the 5-finger x 8-press offline evaluation */
 #define EGIS0576_ENROLL_STAGES 8      /* templates per finger                */
-#define EGIS0576_MIN_COVERAGE 0.55    /* reject partial presses at capture   */
-/* Best-of-templates NCC acceptance threshold.
+
+/* Matcher operating points. Both values are defined by the front-end that
+ * is linked (egis_match.h: em_min_coverage, em_match_threshold), because a
+ * different front-end produces a different score distribution. For
+ * egis_match.c they are 0.55 and 0.53, from the 5-finger x 8-press offline
+ * evaluation described below; egis_match_gabor.c brings its own. */
+#define EGIS0576_MIN_COVERAGE em_min_coverage    /* reject partial presses  */
+/* Best-of-templates NCC acceptance threshold (egis_match.c's 0.53).
  *
  * Measured over two labelled sessions with coverage-guided enrolment (8
  * templates each; 10 genuine and 16 impostor probes from two other fingers,
@@ -66,7 +71,7 @@ static const guint8 img_req[]  = { 0x45, 0x47, 0x49, 0x53, 0x64, 0x0f, 0x96 };
  * score like impostors, so enrolment must sample the whole fingertip rather
  * than the same spot repeatedly.
  */
-#define EGIS0576_MATCH_THRESHOLD 0.53
+#define EGIS0576_MATCH_THRESHOLD em_match_threshold
 
 /* The sensor sometimes serves a stale frame -- a ghost of an earlier press,
  * carrying fresh noise, so it cannot be caught by comparing bytes. Seen in
@@ -664,7 +669,8 @@ identify_ssm_run (FpiSsm *ssm, FpDevice *dev)
             for (gsize t = 0; t < n; t++)
               {
                 em_frame_compute (raws + t * EGIS0576_IMGSIZE, &tmpl);
-                double s = em_match (&probe, &tmpl);
+                /* template first, probe second (egis_match.h) */
+                double s = em_match (&tmpl, &probe);
                 fp_dbg ("template %u/%u score %.3f", (guint) t + 1, (guint) n, s);
                 if (s > best_score)
                   {
