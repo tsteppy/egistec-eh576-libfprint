@@ -95,6 +95,16 @@ static const struct egis_pkt repeat_pkts[] = {
 #define EGIS0576_VAR_THRESHOLD 12.0
 
 /*
+ * No-finger reference for the blank-frame gate (driver/egis_blank.h). The
+ * frames the detect loop already discards below EGIS0576_VAR_THRESHOLD are
+ * exactly the frames wanted, so the reference costs no extra captures. It is
+ * averaged over the first EGIS0576_BASELINE_FRAMES of them and is not used
+ * until EGIS0576_BASELINE_MIN have been seen.
+ */
+#define EGIS0576_BASELINE_FRAMES 8
+#define EGIS0576_BASELINE_MIN    2
+
+/*
  * Bozorth3 threshold. The sensor is small (partial print), so like the 0570
  * driver this is lowered from the default to trade security for usability.
  */

@@ -25,6 +25,7 @@
 #include "egis0576.h"
 #include "drivers_api.h"
 #include "egis_match.h"
+#include "egis_blank.h"
 
 /* Poll and image-request packets used in the capture loop. */
 static const guint8 poll_cmd[] = { 0x45, 0x47, 0x49, 0x53, 0x60, 0x00, 0x00 };
@@ -111,6 +112,11 @@ struct _FpDeviceEgis0576
   gboolean      waiting_clear; /* waiting for a clear sensor before detect:
                                 * a capture must consume a FRESH press, not
                                 * a finger already resting on the sensor    */
+
+  /* No-finger reference, accumulated from frames the detect loop discards */
+  guint32      *baseline_sum;  /* running total, EGIS0576_IMGSIZE entries  */
+  guint8       *baseline_frame;/* its mean: the blank-frame reference      */
+  guint         baseline_num;  /* frames averaged in (0 = no reference)    */
 
   /* Enrolment state */
   GByteArray   *enroll_data; /* accepted template frames, concatenated     */
@@ -259,6 +265,33 @@ init_ssm_new (FpDevice *dev)
   return fpi_ssm_new (dev, init_ssm_run, I_NUM_STATES);
 }
 
+/* Fold a confirmed no-finger frame into the reference. Capped, because the
+ * fixed pattern is stable and there is nothing to gain from averaging the
+ * whole session into it. */
+static void
+baseline_observe (FpDeviceEgis0576 *self, const guint8 *frame)
+{
+  if (self->baseline_num >= EGIS0576_BASELINE_FRAMES)
+    return;
+
+  for (gsize i = 0; i < EGIS0576_IMGSIZE; i++)
+    self->baseline_sum[i] += frame[i];
+  self->baseline_num++;
+  for (gsize i = 0; i < EGIS0576_IMGSIZE; i++)
+    self->baseline_frame[i] = (guint8) (self->baseline_sum[i] / self->baseline_num);
+
+  if (self->baseline_num == EGIS0576_BASELINE_MIN)
+    fp_dbg ("no-finger reference ready (%u frames)", self->baseline_num);
+}
+
+/* The reference, or NULL while too few no-finger frames have been seen. The
+ * gate fails open on NULL, so enrolment is never blocked for want of one. */
+static const guint8 *
+baseline_ref (FpDeviceEgis0576 *self)
+{
+  return self->baseline_num >= EGIS0576_BASELINE_MIN ? self->baseline_frame : NULL;
+}
+
 /*
  * Capture sub-SSM: poll until a finger settles, leave the peak-variance frame
  * in self->best_frame. If self->wait_off is set, additionally poll until the
@@ -390,6 +423,12 @@ capture_ssm_run (FpiSsm *ssm, FpDevice *dev)
         double var = frame_variance (self->frame, EGIS0576_IMGSIZE);
 
         fp_dbg ("frame variance %.1f (threshold %.1f)", var, (double) EGIS0576_VAR_THRESHOLD);
+
+        /* Below the variance threshold the sensor is empty by the same test
+         * the driver already trusts for finger presence, so this frame is a
+         * free sample of the fixed pattern. */
+        if (var < EGIS0576_VAR_THRESHOLD)
+          baseline_observe (self, self->frame);
 
         if (self->waiting_clear)
           {
@@ -542,6 +581,23 @@ enroll_ssm_run (FpiSsm *ssm, FpDevice *dev)
     case E_PROCESS:
       {
         static EmFrame probe;
+        const guint8 *ref = baseline_ref (self);
+
+        /* A frame with no finger on it is the fixed pattern, which the
+         * coherence mask reads as ridges, so it would pass the coverage gate
+         * below and be enrolled. See egis_blank.h. */
+        if (egis_blank_is_blank (self->best_frame, ref, EGIS0576_IMGSIZE))
+          {
+            fp_warn ("enroll stage rejected: the sensor was empty (agreement "
+                     "%.3f with the no-finger reference) -- the capture landed "
+                     "outside the press",
+                     egis_blank_agreement (self->best_frame, ref, EGIS0576_IMGSIZE));
+            fpi_device_enroll_progress (dev, self->enroll_stage, NULL,
+                                        fpi_device_retry_new (FP_DEVICE_RETRY_TOO_SHORT));
+            fpi_ssm_jump_to_state (ssm, E_CAPTURE);
+            break;
+          }
+
         em_frame_compute (self->best_frame, &probe);
 
         if (probe.coverage < EGIS0576_MIN_COVERAGE)
@@ -738,6 +794,9 @@ egis0576_open (FpDevice *dev)
   self->frame = g_malloc0 (EGIS0576_IMGSIZE);
   self->best_frame = g_malloc0 (EGIS0576_IMGSIZE);
   self->prev_frame = g_malloc0 (EGIS0576_IMGSIZE);
+  self->baseline_sum = g_malloc0 (EGIS0576_IMGSIZE * sizeof (guint32));
+  self->baseline_frame = g_malloc0 (EGIS0576_IMGSIZE);
+  self->baseline_num = 0;
   fpi_device_open_complete (dev, NULL);
 }
 
@@ -750,6 +809,9 @@ egis0576_close (FpDevice *dev)
   g_clear_pointer (&self->frame, g_free);
   g_clear_pointer (&self->best_frame, g_free);
   g_clear_pointer (&self->prev_frame, g_free);
+  g_clear_pointer (&self->baseline_sum, g_free);
+  g_clear_pointer (&self->baseline_frame, g_free);
+  self->baseline_num = 0;
   g_usb_device_release_interface (fpi_device_get_usb_device (dev),
                                   EGIS0576_INTF, 0, &error);
   fpi_device_close_complete (dev, error);

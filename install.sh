@@ -76,7 +76,7 @@ fi
 
 bold "== adding the driver =="
 cp "$SRC_DIR"/driver/egis0576.c "$SRC_DIR"/driver/egis0576.h \
-   "$SRC_DIR"/driver/egis_match.h \
+   "$SRC_DIR"/driver/egis_match.h "$SRC_DIR"/driver/egis_blank.h \
    "$LIBFPRINT_DIR/libfprint/drivers/"
 # The matcher front-end. Default: egis_match.c. EGIS0576_FRONTEND=gabor
 # links driver/egis_match_gabor.c instead (same interface, its own operating
