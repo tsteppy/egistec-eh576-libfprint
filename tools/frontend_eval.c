@@ -28,19 +28,35 @@ load_raw (const char *p, uint8_t *b)
   return n == EM_N ? 0 : -1;
 }
 
+/* Reads at most MAXF names and REFUSES a longer manifest. The first version
+ * stopped silently at MAXF: handed 2304 frames it scored the first 96, all at
+ * one end of the sweep, and reported a reassuring maximum that was purely an
+ * artefact of the truncation. A caller cannot tell that from a real result,
+ * so this now fails loudly instead of returning a short list. */
 static int
 read_manifest (const char *path, char names[MAXF][512])
 {
   FILE *f = fopen (path, "r");
   if (!f) { fprintf (stderr, "no manifest %s\n", path); exit (1); }
   int n = 0;
-  while (n < MAXF && fgets (names[n], 512, f))
+  char line[512];
+  while (fgets (line, sizeof line, f))
     {
-      char *nl = strchr (names[n], '\n');
+      char *nl = strchr (line, '\n');
       if (nl) *nl = 0;
-      if (names[n][0]) n++;
+      if (!line[0]) continue;
+      if (n == MAXF)
+        {
+          fprintf (stderr,
+                   "%s: more than MAXF (%d) entries -- refusing to score a "
+                   "truncated manifest; split it into chunks\n", path, MAXF);
+          exit (1);
+        }
+      memcpy (names[n], line, sizeof line);
+      n++;
     }
   fclose (f);
+  if (n == 0) { fprintf (stderr, "%s: empty manifest\n", path); exit (1); }
   return n;
 }
 
