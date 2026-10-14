@@ -61,7 +61,9 @@
  * the two folds put that threshold at 0.793 and 0.803 on raw frames, which
  * is where em_match_threshold below comes from. All of this is in-sample
  * for the angle step and mask parameters, which were chosen on the same
- * data.
+ * data. [Correction: that data is one session, 2026-09-13, and the 0.0 %
+ * is that session's, not my unit's -- the same unit, person and fingers
+ * five days later leave no gap at all. See SECOND SESSION below.]
  *
  * SECOND UNIT (Thaddeus Stepanovich, Yoga 7 16IRL8, 29 genuine / 88
  * impostor decisions, cross-fold, docs/gabor-frontend-second-unit.md):
@@ -69,7 +71,9 @@
  * 17.2 % / 1.1 %; this file on flat-fielded frames 6.9 % / 1.1 %, one of the
  * two folds at 0 / 0. The 0 % / 0 % above did not reproduce there (genuine
  * min 0.600 against impostor max 0.815, flat-fielded), so the honest summary
- * across two units is "a large improvement", not "a clean gap".
+ * across two units is "a large improvement", not "a clean gap". [Correction:
+ * nor did it reproduce on my own unit's second session; see SECOND
+ * SESSION.]
  *
  * THE FLAT-FIELD IS HALF OF IT, AND IT IS NOT A FREE-STANDING NICETY. The
  * sensor's fixed-pattern noise is per-sensel and per-unit, and it is what
@@ -87,6 +91,33 @@
  *     effect on the old front-end.
  * The threshold it lands on is still unit-dependent at this sample size
  * (0.75 on my flat-fielded unit, 0.81 on his); a third unit decides.
+ * [Correction: "unit-dependent" undersold it. There is no gap to place a
+ * threshold in on the second session of my unit, nor on the two units
+ * whose Gabor scores were reported to the out-of-tree driver since
+ * (sam-dant's, irvingpop's); "my unit" above means one session.]
+ *
+ * SECOND SESSION, AND WHAT THE SCORE MEASURES (found 2026-09-26). The same
+ * unit, person and fingers five days after the MEASURED session
+ * (2026-09-18) give 13 / 60 false rejects and 18 / 480 false accepts, worst
+ * impostor 0.896, all 18 right thumb against right index, where the vendor
+ * matcher on the same frames accepts none of the 480. Measured with the
+ * out-of-tree driver's kit (github.com/PHILIPPDEV5396/libfprint-egis0576)
+ * and its revision of this file -- the same enhancement and NCC search, plus a
+ * ridge-evidence gate and a ridge-period check that can only reject; accept
+ * point 0.78; flat-fielded frames; that driver's rule of two consecutive
+ * frames over the threshold, the second corroborated on the un-flat-fielded
+ * bytes. The cause is what the score measures: whether two patches agree
+ * in ridge flow (direction and spacing), not whose skin they are, so two
+ * different fingers that put near-parallel ridges at a similar angle and
+ * period on the sensor score like one finger. On
+ * 2026-09-13 the thumb lay 42-48 deg from both index fingers, outside the
+ * +-10 deg search; on 2026-09-18 its dominant ridge angle was 1.3 deg from
+ * the right index finger's. Threshold, overlap floor (EG_MIN_OVERLAP) and
+ * search width were each measured to trade false rejects for false accepts,
+ * nothing more. The 0.0 % under MEASURED is one favourable session, and the
+ * one every constant here was tuned on. Measurements and root cause:
+ * docs/matcher-comparison.md in that repository, "2026-09-26: what prevents
+ * a universal 0/0".
  *
  * COST (synthetic frames, idle laptop, gcc -O3): em_frame_compute 1.6 ms
  * (egis_match.c: 0.17 ms), em_match 4.0 ms (0.85 ms at +-6, 6.4 ms at +-19).
@@ -108,9 +139,13 @@
  * threshold of the RAW-FRAME measurement above -- this driver does not
  * flat-field. It is a one-unit value: the second unit wanted 0.85 on raw
  * frames and 0.81 flat-fielded (see the header). If a flat-field lands in
- * the capture path, re-measure and move this with it. The coverage gate is
- * placed where the per-pixel mask separates well-placed frames (0.70-0.75)
- * from empty or smeared ones (< 0.2). */
+ * the capture path, re-measure and move this with it. [Correction: it is a
+ * one-SESSION value. On my unit's second session no threshold separates
+ * the populations (worst impostor 0.896, see SECOND SESSION in the header),
+ * so outside 2026-09-13 this constant trades false rejects against false
+ * accepts; it does not separate them.] The coverage gate is placed where
+ * the per-pixel mask separates well-placed frames (0.70-0.75) from empty
+ * or smeared ones (< 0.2). */
 const double em_match_threshold = 0.80;
 const double em_min_coverage = 0.35;
 

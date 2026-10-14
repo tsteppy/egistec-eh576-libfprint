@@ -145,13 +145,34 @@ an orientation-selective Gabor enhancement in place of the high-pass, a
 per-pixel coherence mask and a ±10° rotation search on top of the
 translation search, and its own operating point (the threshold and coverage
 gate belong to the front-end, `em_match_threshold` / `em_min_coverage`).
-On the one unit it was measured on (60 genuine / 480 same-person impostor
-press comparisons, raw frames as this driver feeds them) the two populations
-stop overlapping: lowest genuine 0.81, highest impostor 0.77, 0 % / 0 % with
-the threshold chosen on one half of the data and applied to the other. Every
-parameter was chosen on that same unit, which is exactly why it is opt-in
-until someone else's score table says the same; the file's header has the
-numbers, the cost (4 ms per comparison) and the caveats.
+On the one session it was measured on (2026-09-13, one unit, 60 genuine /
+480 same-person impostor press comparisons, raw frames as this driver feeds
+them) the two populations stop overlapping: lowest genuine 0.81, highest
+impostor 0.77, 0 % / 0 % with the threshold chosen on one half of the data
+and applied to the other. Every parameter was chosen on that same session,
+which is exactly why it is opt-in until someone else's score table says the
+same; the file's header has the numbers, the cost (4 ms per comparison) and
+the caveats.
+
+**Correction: that 0 % / 0 % is one favourable session, not a property of the
+unit or of the front-end** (found 2026-09-26; until this correction the
+paragraph above began "On the one unit it was measured on"). The same unit,
+person and fingers five days later (2026-09-18), measured with the kit of
+[the out-of-tree driver](https://github.com/PHILIPPDEV5396/libfprint-egis0576)
+and its revision of this front-end (same enhancement and NCC search plus
+checks that can only reject, accept point 0.78, flat-fielded frames, two
+consecutive frames over the threshold, the second corroborated on the
+un-flat-fielded bytes), give **13 of 60 false rejects and 18 of 480 false
+accepts**, worst impostor 0.896, all 18 right thumb against
+right index; the vendor matcher that driver also builds accepts none of the
+480 on the same frames. The cause is what the score measures: whether two
+patches agree in ridge flow — direction and spacing — not whose finger they
+are, so two different fingers that land with near-parallel ridges at a
+similar angle score like one. No constant measured fixes that: threshold,
+overlap floor and search width each only trade false rejects for false
+accepts. That driver's planned libfprint merge request, which uses this
+front-end, is on hold. Measurements and root cause:
+[what prevents a universal 0/0](https://github.com/PHILIPPDEV5396/libfprint-egis0576/blob/main/docs/matcher-comparison.md#2026-09-26-what-prevents-a-universal-00).
 
 ## Known limitations
 
